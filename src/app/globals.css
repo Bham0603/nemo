@@ -1,0 +1,394 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #000000;
+  --color-shell: rgba(255, 255, 255, 0.02);
+  --color-panel: rgba(255, 255, 255, 0.032);
+  --color-panel-2: rgba(255, 255, 255, 0.055);
+  --color-panel-3: rgba(255, 255, 255, 0.09);
+  --color-line: rgba(255, 255, 255, 0.09);
+  --color-line-soft: rgba(255, 255, 255, 0.055);
+  --color-ink: #f4f5f7;
+  --color-muted: #9a9ca4;
+  --color-faint: #61636b;
+
+  /* monochrome accent — no hue anywhere in the chrome */
+  --color-accent: #d8dae1;
+  --color-accent-2: #ffffff;
+  --color-accent-dim: #8b8f9a;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-shell: 26px;
+}
+
+* {
+  border-color: var(--color-line-soft);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: #000;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------- *
+ *  Space canvas
+ * ---------------------------------------------------------------- */
+
+.space-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #0d0e12 0%, #060608 45%, #000 100%);
+  pointer-events: none;
+}
+
+/* neutral, almost colourless bloom — light in a void, not a hue */
+.space-nebula {
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(38% 30% at 28% 22%, rgba(255, 255, 255, 0.075), transparent 70%),
+    radial-gradient(32% 26% at 74% 68%, rgba(200, 210, 230, 0.04), transparent 72%),
+    radial-gradient(26% 22% at 52% 92%, rgba(255, 255, 255, 0.028), transparent 70%);
+  filter: blur(50px);
+  animation: nebula-drift 46s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+.space-nebula-2 {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(
+    30% 24% at 62% 18%,
+    rgba(220, 228, 245, 0.035),
+    transparent 70%
+  );
+  filter: blur(70px);
+  animation: nebula-drift 68s ease-in-out infinite alternate-reverse;
+  will-change: transform;
+}
+
+/* faint orbital rings, very low contrast */
+.space-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.space-orbit::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  height: 4px;
+  width: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 12px 2px rgba(255, 255, 255, 0.35);
+}
+
+.space-orbit-a {
+  height: 1180px;
+  width: 1180px;
+  animation: orbit-spin 90s linear infinite;
+}
+.space-orbit-b {
+  height: 1620px;
+  width: 1620px;
+  animation: orbit-spin 150s linear infinite reverse;
+  border-color: rgba(255, 255, 255, 0.018);
+}
+
+.space-stars {
+  position: absolute;
+  inset: 0;
+  opacity: 0.95;
+}
+
+/* vignette so the glass has something to sit against */
+.space-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    100% 80% at 50% 45%,
+    transparent 30%,
+    rgba(0, 0, 0, 0.3) 78%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+/* fine grain, kills banding in the gradients */
+.space-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.14;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+@keyframes nebula-drift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate3d(2%, 2%, 0) scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-1%, 3%, 0) scale(1.03);
+    opacity: 0.85;
+  }
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ *  Glass system — black, translucent, no tint
+ * ---------------------------------------------------------------- */
+
+.glass {
+  position: relative;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.045) 0%,
+      rgba(255, 255, 255, 0.014) 42%,
+      rgba(255, 255, 255, 0.006) 100%
+    ),
+    rgba(6, 6, 8, 0.72);
+  backdrop-filter: blur(28px) saturate(120%);
+  -webkit-backdrop-filter: blur(28px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02),
+    0 40px 120px -50px rgba(0, 0, 0, 0.95);
+}
+
+.glass-soft {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.032),
+    rgba(255, 255, 255, 0.01)
+  );
+  backdrop-filter: blur(18px) saturate(115%);
+  -webkit-backdrop-filter: blur(18px) saturate(115%);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* the bright hairline rim from the reference shot */
+.rim {
+  position: relative;
+}
+.rim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.38) 0%,
+    rgba(255, 255, 255, 0.07) 28%,
+    rgba(255, 255, 255, 0.02) 55%,
+    rgba(255, 255, 255, 0.16) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+/* soft under-glow beneath floating glass — white, not violet */
+.rim-glow::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: radial-gradient(
+    60% 100% at 50% 100%,
+    rgba(255, 255, 255, 0.14),
+    transparent 70%
+  );
+  filter: blur(22px);
+  opacity: 0.5;
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.rim-glow:hover::after,
+.rim-glow:focus-within::after {
+  opacity: 0.9;
+}
+
+/* hover lift for interactive glass */
+.glass-hover {
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.glass-hover:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.065),
+    rgba(255, 255, 255, 0.025)
+  );
+  border-color: rgba(255, 255, 255, 0.11);
+}
+
+/* ---------------------------------------------------------------- *
+ *  Scrollbars
+ * ---------------------------------------------------------------- */
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------- *
+ *  Motion
+ * ---------------------------------------------------------------- */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade {
+  animation: fade-in 0.6s ease-out both;
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* slow breathing halo used behind the hero mark */
+@keyframes halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.06);
+  }
+}
+.animate-halo {
+  animation: halo 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .space-nebula,
+  .space-nebula-2,
+  .space-orbit-a,
+  .space-orbit-b,
+  .animate-halo,
+  .animate-pulse-soft,
+  .shimmer {
+    animation: none !important;
+  }
+  .animate-rise,
+  .animate-fade {
+    animation-duration: 0.01ms !important;
+  }
+}
