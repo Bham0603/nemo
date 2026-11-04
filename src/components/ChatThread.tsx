@@ -22,7 +22,7 @@ function CitationChips({ citations }: { citations: Citation[] }) {
   return (
     <div className="mt-3 flex flex-wrap gap-1.5">
       {citations.map((c, i) => {
-        const src = sourceById(sources, c.sourceId);
+        const src = typeof c.sourceId === "string" ? sourceById(sources, c.sourceId) : null;
         if (!src) return null;
         const key = `${c.sourceId}-${i}`;
         const isOpen = open === key;

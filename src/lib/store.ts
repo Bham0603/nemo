@@ -67,6 +67,9 @@ interface State {
   appendMessage: (chatId: string, m: Message) => void;
   updateMessage: (chatId: string, id: string, patch: Partial<Message>) => void;
   newChat: () => string;
+  setChats: (chats: Chat[]) => void;
+  deleteChat: (id: string) => void;
+  renameChat: (id: string, title: string) => void;
 
   /* notes */
   notes: Note[];
@@ -227,6 +230,19 @@ export const useRecall = create<State>((set) => ({
     set((st) => ({ chats: [chat, ...st.chats], activeChatId: id }));
     return id;
   },
+  setChats: (chats) => set({ chats }),
+  deleteChat: (id) =>
+    set((st) => {
+      const remaining = st.chats.filter((c) => c.id !== id);
+      return {
+        chats: remaining,
+        activeChatId: st.activeChatId === id ? (remaining[0]?.id || "") : st.activeChatId,
+      };
+    }),
+  renameChat: (id, title) =>
+    set((st) => ({
+      chats: st.chats.map((c) => (c.id === id ? { ...c, title } : c)),
+    })),
 
   notes: seedNotes,
   setNotes: (n) => set({ notes: n }),

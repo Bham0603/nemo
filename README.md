@@ -376,6 +376,88 @@ RECALL uses `@supabase/ssr` with cookie-based authentication and adheres to the 
 │       └── store.ts                 # Zustand workspace store
 ```
 
+
+---
+
+## Gemini-Powered Conversational RAG Chatbot (Step 7)
+
+Step 7 implements the complete conversational AI experience powered by Google Gemini (`gemini-3.8-flash`) and Retrieval-Augmented Generation (RAG). RECALL answers user questions by synthesizing relevant passages from their personal knowledge library with passage-level citations and real-time streaming responses.
+
+### 1. Dual Chat Modes
+
+- **Regular Chat**: General conversational AI mode without document grounding. Gemini answers broad technical and general questions while preserving RECALL's helpful persona.
+- **Context Chat (RAG)**: Grounded retrieval mode. The user's query is embedded via `gemini-embedding-2`, matched against their personal knowledge base via pgvector cosine similarity, and assembled into a bounded knowledge context. The answer is generated with strict passage-level citation markers (`[S1]`, `[S2]`).
+
+### 2. End-to-End RAG Pipeline
+
+```
+[User Query] 
+     │
+     ▼
+[formatSearchQueryForEmbedding] ──► [Gemini Embedding 2 (1536-dim)]
+                                                │
+                                                ▼
+                                    [search_knowledge_chunks RPC] (pgvector)
+                                                │
+                                                ▼
+[assembleContext] ◄────────────── [Top Ranked Document Chunks]
+     │
+     ├── Assigns [S1], [S2] IDs
+     ├── Enforces 100k Character Budget
+     └── Injects Grounding & Anti-Injection Rules
+     │
+     ▼
+[Gemini 3.8 Flash Stream] (generateContentStream)
+     │
+     ▼
+[Server-Sent Events (SSE)] ──► Client Incremental Tokens
+     │
+     ▼
+[parseAndValidateCitations] ──► Hallucination Filter ──► Persist Assistant Turn
+```
+
+### 3. Source Citation System & Hallucination Filter
+
+- **Citation Markers**: Answers in Context Chat cite claims with explicit markers (`[S1]`, `[S2]`).
+- **Validation**: Generated citations are parsed and cross-referenced against the actual retrieved context chunks. Any hallucinated citation (e.g. `[S99]`) is stripped before persistence.
+- **Passage Metadata**: Each validated citation links to the source document, page number, chunk ID, verbatim excerpt, and cosine similarity score.
+- **Interactive UI**: Citations appear as clickable chips in the chat thread, revealing document previews and excerpts on hover/click.
+
+### 4. Privacy & Consent Architecture
+
+- **Independent Chat Consent**: Controlled by `profiles.gemini_chat_consent` (independent of `gemini_embedding_consent`). Users must explicitly opt in via **Settings → AI preferences → Enable AI Chat**.
+- **Server-Side Enforcement**: Unconsented requests return `403 CHAT_CONSENT_REQUIRED`.
+- **Zero API Key Exposure**: All Gemini calls run server-side. The API key is never sent to the browser.
+- **Multi-Tenant Isolation**: RLS and explicit server checks ensure users can only retrieve and converse with their own documents.
+
+### 5. Conversation Persistence & Streaming Protocol
+
+- **Persistence**: Conversations and turns are stored in Supabase `conversations` and `messages` tables.
+- **Streaming Protocol**: Route Handlers emit Server-Sent Events (`text/event-stream`) with typed JSON payloads:
+  - `start`: Emits `conversationId` and `messageId`
+  - `token`: Incremental text chunks
+  - `citation`: Array of validated citations
+  - `done`: Final stream completion
+  - `error`: Safe error notifications
+- **Rate Limiting**: Enforces a per-user limit of 30 messages per hour to protect API quotas.
+
+### 6. Running the Step 7 Test Suite
+
+```bash
+npx tsx scripts/test-step7.ts
+```
+Covers:
+- Gemini Chat configuration & model identification
+- Independent chat privacy consent verification
+- RAG retrieval, context assembly & citation ID assignment
+- Context chat & regular chat system prompt builders + prompt injection protection
+- Citation parsing, deduplication & hallucination filtering
+- Conversation history loading & role mapping (`assistant` → `model`)
+- SSE streaming protocol & event serialization
+- Request validation, oversized message protection & multi-tenant isolation
+- Live Gemini 3.8 Flash streaming completion (when `GEMINI_API_KEY` is configured)
+
+
 ---
 
 ## Design System

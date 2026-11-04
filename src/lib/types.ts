@@ -18,9 +18,15 @@ export interface Source {
 }
 
 export interface Citation {
-  sourceId: string;
+  citationId?: string;
+  sourceId?: string | null;
+  chunkId?: string;
+  documentTitle?: string;
   page?: number;
-  snippet: string;
+  pageNumber?: number | null;
+  snippet?: string;
+  excerpt?: string;
+  similarityScore?: number;
 }
 
 export interface Message {
@@ -48,6 +54,7 @@ export interface Chat {
   selectedSourceIds: string[];
   messages: Message[];
   updatedAt: string;
+  dbConversationId?: string | null;
 }
 
 export interface Note {

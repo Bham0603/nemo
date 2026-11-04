@@ -15,7 +15,7 @@ import {
   X,
   Youtube,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useRecall } from "@/lib/store";
 import type { ContextGroup } from "@/lib/types";
@@ -40,6 +40,31 @@ export function ContextPanel() {
   const newChat = useRecall((s) => s.newChat);
   const contextOpen = useRecall((s) => s.contextPanelOpen);
   const setContextOpen = useRecall((s) => s.setContextPanelOpen);
+  const chats = useRecall((s) => s.chats);
+  const setActiveChat = useRecall((s) => s.setActiveChat);
+  const setChats = useRecall((s) => s.setChats);
+  const deleteChat = useRecall((s) => s.deleteChat);
+
+  useEffect(() => {
+    fetch("/api/conversations")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.conversations && d.conversations.length > 0) {
+          const dbChats = d.conversations.map((c: { id: string; title: string; conversation_mode: "regular" | "context"; updated_at: string }) => ({
+            id: c.id,
+            dbConversationId: c.id,
+            title: c.title,
+            subtitle: `${c.conversation_mode === "context" ? "Context" : "Regular"} chat`,
+            mode: c.conversation_mode,
+            selectedSourceIds: [],
+            messages: [],
+            updatedAt: c.updated_at,
+          }));
+          setChats(dbChats);
+        }
+      })
+      .catch(() => {});
+  }, [setChats]);
 
   const [query, setQuery] = useState("");
   const [addingTo, setAddingTo] = useState<string | null>(null);
@@ -89,6 +114,52 @@ export function ContextPanel() {
             <X className="h-4 w-4" />
           </button>
         </div>
+
+      {/* Conversations switcher */}
+      {chats.length > 1 && (
+        <div className="px-5 pb-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-faint">
+              Conversations ({chats.length})
+            </span>
+          </div>
+          <div className="space-y-1 max-h-32 overflow-y-auto scroll-thin rounded-xl border border-line bg-panel/40 p-1">
+            {chats.map((c) => (
+              <div
+                key={c.id}
+                className={cn(
+                  "group flex items-center justify-between rounded-lg px-2 py-1.5 text-[12px] transition",
+                  c.id === chat.id
+                    ? "bg-white/10 text-white font-medium"
+                    : "text-muted hover:bg-white/[0.04] hover:text-ink"
+                )}
+              >
+                <button
+                  onClick={() => setActiveChat(c.id)}
+                  className="flex-1 text-left truncate mr-1"
+                >
+                  {c.title}
+                </button>
+                {c.dbConversationId && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (confirm("Delete this conversation?")) {
+                        await fetch(`/api/conversations/${c.dbConversationId}`, { method: "DELETE" }).catch(() => {});
+                        deleteChat(c.id);
+                      }
+                    }}
+                    title="Delete conversation"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-faint hover:text-rose-400 transition"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Mode switch */}
       <div className="px-5 pb-3">

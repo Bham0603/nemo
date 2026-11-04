@@ -4,43 +4,22 @@ import { ArrowUp, Paperclip, Plus, Square, Wand2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRecall } from "@/lib/store";
 import { cn } from "@/lib/utils";
-
-const CANNED: Record<string, string> = {
-  default:
-    "Here is what your knowledge library says.\n\n**The short answer.** Your sources converge on grounded intelligence: generative models require external non-parametric retrieval to provide reliable factual accuracy.\n\n**Key principles.** Transformer Architecture establishes parallel self-attention mechanisms over token sequences, while RAG research and Vector Database Research demonstrate that hybrid retrieval (dense embeddings + BM25) eliminates hallucinations.\n\n**What to do next.** Ensure chunk boundaries align with semantic section headers rather than arbitrary fixed token counts, and enforce passage-level citations for every generated claim.",
-  transformer:
-    "**Transformer Architecture, from your own sources.**\n\n**Transformer Architecture.pdf** establishes the foundational paradigm: self-attention eliminates recurrence and convolutions entirely, allowing tokens to directly route information to and from each other via scaled dot-product attention.\n\n**Deep Learning Notes.pdf** provides the operational mechanics: Multi-head attention projects queries, keys, and values into parallel subspaces, while residual connections and LayerNorm prevent vanishing gradients across deep layer stacks.\n\n**Key takeaway.** Attention is not simply an alignment layer; it is the core routing mechanism of modern language representation.",
-  connect:
-    "**Connecting Transformer Architecture and RAG.**\n\n**Transformer Architecture.pdf** describes how deep encoders produce dense contextual representations. **RAG Research.pdf** and **Vector Database Research.md** take those high-dimensional embeddings and index them with HNSW graphs for approximate nearest-neighbor search.\n\nRead together, they form a unified knowledge system: the Transformer provides the semantic understanding, while the vector database and RAG pipeline provide the persistent, verifiable external memory.",
-  summarise:
-    "**Research Collection — Core Knowledge Themes.**\n\n**Theme 1: Self-attention and representation learning.** Transformer Architecture.pdf and Deep Learning Notes.pdf establish how attention replaces sequential recurrence with O(1) path length between distant tokens.\n\n**Theme 2: Grounded retrieval and verification.** RAG Research.pdf and Vector Database Research.md prove that pairing dense vector similarity with lexical BM25 produces robust recall without parametric hallucination.\n\n**Theme 3: Autonomous orchestration.** AI Agents Documentation.pdf shows how LLM reasoning cores integrate memory and tool use to execute multi-step workflows.",
-  week:
-    "**Knowledge notes summary:**\n\n1. **Chunking is a product decision** (daily note, Nov 1). Chunk size chooses what unit of meaning the user is allowed to be answered with.\n2. **Citations must be passage-level** (daily note, Oct 31). A citation that does not support the sentence above it transfers trust without transferring evidence.\n3. **Dense vs sparse retrieval trade-offs** (Oct 29). Hybrid fusion with BM25 preserves exact identifier recall.\n4. **pgvector operating notes** (Oct 25). Exact scan is simpler and sufficient under 500k chunks before requiring HNSW graph indexing.",
-};
-
-function pickReply(prompt: string) {
-  const p = prompt.toLowerCase();
-  if (p.includes("transformer") || p.includes("attention")) return CANNED.transformer;
-  if (p.includes("connect") || p.includes("two") || p.includes("rag")) return CANNED.connect;
-  if (p.includes("summar")) return CANNED.summarise;
-  if (p.includes("week") || p.includes("learn") || p.includes("note")) return CANNED.week;
-  return CANNED.default;
-}
+import type { StreamEvent, Citation } from "@/lib/chat/types";
 
 export function Composer() {
   const chat = useRecall((s) => s.chats.find((c) => c.id === s.activeChatId));
   const appendMessage = useRecall((s) => s.appendMessage);
   const updateMessage = useRecall((s) => s.updateMessage);
-  const sources = useRecall((s) => s.sources);
 
   const [value, setValue] = useState("");
   const [generating, setGenerating] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    const pending = timers.current;
-    return () => pending.forEach(clearTimeout);
+    return () => {
+      abortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -52,7 +31,12 @@ export function Composer() {
 
   if (!chat) return null;
 
-  const send = () => {
+  const stop = () => {
+    abortRef.current?.abort();
+    setGenerating(false);
+  };
+
+  const send = async () => {
     const text = value.trim();
     if (!text || generating) return;
 
@@ -64,48 +48,125 @@ export function Composer() {
       createdAt: now,
     });
     setValue("");
-
-    const replyId = `a_${Date.now()}`;
     setGenerating(true);
 
-    const t1 = setTimeout(() => {
-      const grounded = chat.selectedSourceIds
-        .map((id) => sources.find((s) => s.id === id))
-        .filter(Boolean)
-        .slice(0, 2);
+    // Placeholder for streaming assistant reply
+    const replyId = `a_${Date.now()}`;
+    appendMessage(chat.id, {
+      id: replyId,
+      role: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+      streaming: true,
+      citations: [],
+    });
 
-      appendMessage(chat.id, {
-        id: replyId,
-        role: "assistant",
-        content: "",
-        createdAt: new Date().toISOString(),
-        streaming: true,
-        citations: grounded.map((s) => ({
-          sourceId: s!.id,
-          page: s!.pages ? Math.min(12, s!.pages) : undefined,
-          snippet: s!.excerpt,
-        })),
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: chat.dbConversationId ?? null,
+          message: text,
+          mode: chat.mode,
+          selectedSourceIds: chat.selectedSourceIds,
+          selectedCollectionIds: [],
+        }),
+        signal: controller.signal,
       });
 
-      const full = pickReply(text);
-      let i = 0;
-      const step = Math.max(4, Math.ceil(full.length / 90));
-      const tick = () => {
-        i = Math.min(full.length, i + step);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Request failed" }));
+        const errorMsg =
+          err.code === "CHAT_CONSENT_REQUIRED"
+            ? "AI chat is not enabled. Please go to Settings → AI preferences and enable Gemini AI Chat."
+            : err.error || "Failed to send message.";
         updateMessage(chat.id, replyId, {
-          content: full.slice(0, i),
-          streaming: i < full.length,
+          content: errorMsg,
+          streaming: false,
         });
-        if (i < full.length) {
-          timers.current.push(setTimeout(tick, 16));
-        } else {
-          setGenerating(false);
-        }
-      };
-      tick();
-    }, 420);
+        setGenerating(false);
+        return;
+      }
 
-    timers.current.push(t1);
+      if (!res.body) throw new Error("No response body");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulatedText = "";
+      let dbConversationId: string | null = null;
+
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (!json) continue;
+
+          let event: StreamEvent;
+          try {
+            event = JSON.parse(json);
+          } catch {
+            continue;
+          }
+
+          if (event.type === "start") {
+            dbConversationId = event.data.conversationId;
+            // Store the real conversation ID on the chat
+            useRecall.setState((st) => ({
+              chats: st.chats.map((c) =>
+                c.id === chat.id
+                  ? { ...c, dbConversationId: event.data.conversationId }
+                  : c
+              ),
+            }));
+          } else if (event.type === "token") {
+            accumulatedText += event.data.text;
+            updateMessage(chat.id, replyId, {
+              content: accumulatedText,
+              streaming: true,
+            });
+          } else if (event.type === "citation") {
+            const citations = event.data as Citation[];
+            updateMessage(chat.id, replyId, { citations });
+          } else if (event.type === "done") {
+            updateMessage(chat.id, replyId, { streaming: false });
+          } else if (event.type === "error") {
+            updateMessage(chat.id, replyId, {
+              content: event.data.message || "An error occurred.",
+              streaming: false,
+            });
+          }
+        }
+      }
+
+      // Final update
+      updateMessage(chat.id, replyId, { streaming: false });
+      void dbConversationId; // consumed via setState above
+    } catch (err: unknown) {
+      if ((err as Error)?.name === "AbortError") {
+        updateMessage(chat.id, replyId, { streaming: false });
+        return;
+      }
+      const msg = err instanceof Error ? err.message : "Connection error.";
+      updateMessage(chat.id, replyId, {
+        content: msg,
+        streaming: false,
+      });
+    } finally {
+      setGenerating(false);
+      abortRef.current = null;
+    }
   };
 
   return (
@@ -127,11 +188,12 @@ export function Composer() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                send();
+                void send();
               }
             }}
             placeholder="Ask me to do anything…"
-            className="max-h-[160px] flex-1 resize-none bg-transparent px-1 py-2.5 text-[13.5px] leading-relaxed text-ink placeholder:text-faint/90 focus:outline-none scroll-thin"
+            disabled={generating}
+            className="max-h-[160px] flex-1 resize-none bg-transparent px-1 py-2.5 text-[13.5px] leading-relaxed text-ink placeholder:text-faint/90 focus:outline-none scroll-thin disabled:opacity-60"
           />
 
           <button className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full text-faint transition hover:bg-white/[0.07] hover:text-ink">
@@ -139,29 +201,20 @@ export function Composer() {
           </button>
 
           <div className="mb-0.5 mr-0.5 hidden shrink-0 items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-muted sm:flex">
-            Auto
-            <span className="text-faint">Medium</span>
-            <svg viewBox="0 0 10 10" className="h-2.5 w-2.5 text-faint">
-              <path
-                d="M2 4l3 3 3-3"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
+            {chat.mode === "context" ? "Context" : "Regular"}
+            <span className="text-faint">Chat</span>
           </div>
 
           {generating ? (
             <button
-              onClick={() => setGenerating(false)}
+              onClick={stop}
               className="mb-0.5 flex shrink-0 items-center gap-1.5 rounded-full bg-white/90 px-3.5 py-2 text-[12px] font-medium text-black transition hover:bg-white"
             >
               <Square className="h-3 w-3 fill-current" /> Stop
             </button>
           ) : (
             <button
-              onClick={send}
+              onClick={() => void send()}
               disabled={!value.trim()}
               className={cn(
                 "mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full transition duration-300",

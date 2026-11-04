@@ -9,7 +9,7 @@ import {
   Trash2,
   User,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useRecall } from "@/lib/store";
 import { useAuth } from "@/components/AuthProvider";
@@ -58,6 +58,32 @@ export function SettingsView() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [chatConsent, setChatConsentState] = useState<boolean | null>(null);
+  const [savingChatConsent, setSavingChatConsent] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/chat/consent")
+      .then((r) => r.json())
+      .then((d) => setChatConsentState(Boolean(d.hasConsent)))
+      .catch(() => setChatConsentState(false));
+  }, []);
+
+  const handleChatConsent = async (val: boolean) => {
+    setSavingChatConsent(true);
+    try {
+      await fetch("/api/chat/consent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consent: val }),
+      });
+      setChatConsentState(val);
+      flash(val ? "AI chat enabled." : "AI chat disabled.");
+    } catch {
+      flash("Failed to update chat consent.");
+    } finally {
+      setSavingChatConsent(false);
+    }
+  };
 
   const flash = (msg: string) => {
     setNotice(msg);
@@ -433,6 +459,32 @@ export function SettingsView() {
                     />
                   </div>
                 </div>
+              </SectionCard>
+              <SectionCard
+                title="Gemini AI Chat"
+                description="Allow your messages to be sent to Google Gemini for AI-powered conversational answers."
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[12px] text-ink/90">Enable AI Chat</p>
+                    <p className="text-[11px] text-faint">
+                      Your questions will be processed by Google Gemini to generate answers.
+                      Your library content is only used in Context Chat mode when you explicitly select sources.
+                    </p>
+                  </div>
+                  {chatConsent === null ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-faint" />
+                  ) : (
+                    <Toggle
+                      checked={chatConsent}
+                      onChange={handleChatConsent}
+                      label="Enable AI Chat"
+                    />
+                  )}
+                </div>
+                {savingChatConsent && (
+                  <p className="mt-2 text-[11px] text-faint">Saving...</p>
+                )}
               </SectionCard>
             </div>
           )}

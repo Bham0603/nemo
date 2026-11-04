@@ -18,6 +18,8 @@ export type Database = {
           role: string;
           gemini_embedding_consent: boolean;
           gemini_consent_updated_at: string | null;
+          gemini_chat_consent: boolean;
+          gemini_chat_consent_updated_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +31,8 @@ export type Database = {
           role?: string;
           gemini_embedding_consent?: boolean;
           gemini_consent_updated_at?: string | null;
+          gemini_chat_consent?: boolean;
+          gemini_chat_consent_updated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -40,6 +44,8 @@ export type Database = {
           role?: string;
           gemini_embedding_consent?: boolean;
           gemini_consent_updated_at?: string | null;
+          gemini_chat_consent?: boolean;
+          gemini_chat_consent_updated_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -173,7 +179,7 @@ export type Database = {
           id: string;
           user_id: string;
           title: string;
-          conversation_mode: "library" | "web" | "deep-research" | "focus";
+          conversation_mode: "regular" | "context";
           created_at: string;
           updated_at: string;
         };
@@ -181,7 +187,7 @@ export type Database = {
           id?: string;
           user_id: string;
           title: string;
-          conversation_mode?: "library" | "web" | "deep-research" | "focus";
+          conversation_mode?: "regular" | "context";
           created_at?: string;
           updated_at?: string;
         };
@@ -189,7 +195,7 @@ export type Database = {
           id?: string;
           user_id?: string;
           title?: string;
-          conversation_mode?: "library" | "web" | "deep-research" | "focus";
+          conversation_mode?: "regular" | "context";
           created_at?: string;
           updated_at?: string;
         };
@@ -203,6 +209,9 @@ export type Database = {
           role: "user" | "assistant" | "system";
           content: string;
           citations: Json;
+          model: string | null;
+          generation_status: string | null;
+          retrieval_metadata: Json | null;
           created_at: string;
         };
         Insert: {
@@ -212,6 +221,9 @@ export type Database = {
           role: "user" | "assistant" | "system";
           content: string;
           citations?: Json;
+          model?: string | null;
+          generation_status?: string | null;
+          retrieval_metadata?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -221,6 +233,9 @@ export type Database = {
           role?: "user" | "assistant" | "system";
           content?: string;
           citations?: Json;
+          model?: string | null;
+          generation_status?: string | null;
+          retrieval_metadata?: Json | null;
           created_at?: string;
         };
         Relationships: [];
